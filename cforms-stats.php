@@ -6,7 +6,7 @@ Description: Provides data statistics for database form data collected by the cf
 Version: 1.0.20131003
 Author: Matthew Sigley
 Author URI: http://chaosmedley.com/
-License: GPLv3
+License: GPLv2
 
 TODO:
 -Form field validatation.
