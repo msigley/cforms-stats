@@ -15,6 +15,9 @@ TODO:
 
 Change Log:
 
+1.0.20131004
+-Added fuzzy matching when comparing textarea lines.
+
 1.0.20131003
 -Added options for specifying a date range for the generated statistics.
 -Added option for selecting a set number of random form submissions.
@@ -212,9 +215,11 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 				//Data is broken down by phrases separated by newlines. 
 				$delimiter = "\n";
 				$limit = 10;
+				$fuzzy_matching = true;
 			case "checkboxgroup":
 				//Assume data is comma delimited, is delimiter is not set
 				if (empty($delimiter)) $delimiter = ',';
+				if (empty($fuzzy_matching)) $fuzzy_matching = false;
 				
 				//Get the unique data sets and their number of occurances
 				$query = "SELECT t.field_val as data_values,
@@ -241,8 +246,36 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 					//Split data values based on delimiter
 					$data_values = explode($delimiter, $data_values);
 					foreach ($data_values as $data_value) {
+						//Basic sanitation
+						$data_value = trim($data_value);
+						
+						//Extensive sanitation to implement fuzzy matches
+						if ($fuzzy_matching) {
+							$data_value = strtolower($data_value);
+							
+							//Eliminate articles at the begining of the string
+							$articles = array('the', 'a', 'an');
+							$data_value = explode(' ', $data_value);
+							if( false !== array_search($data_value[0], $articles) )
+								array_shift($data_value);
+							
+							//Replace commonly used symbols with their article equivelent
+							$articles = array('&' => 'and', '@' => 'at', '#' => 'number', '%' => 'percent');
+							foreach( $data_value as &$data_word ) {
+								if( isset($articles[$data_word]) )
+									$data_word = $articles[$data_word];
+							}
+							
+							$data_value = implode(' ', $data_value);
+							
+							//Remove answers equivelent to nothing
+							$empty_words = array('nope', 'no', 'none', 'nothing', 'n/a', 'n\a');
+							if( false !== array_search($data_value, $empty_words) )
+								$data_value = '';
+						}
+							
 						if (!empty($data_value))
-							$results[trim($data_value)] += $result_set->data_count;
+							$results[$data_value] += $result_set->data_count;
 					}
 				}
 				
