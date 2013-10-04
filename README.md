@@ -1,12 +1,12 @@
 cforms-stats
 ============
 
-Add statistical analysis plugin for use with form date collected by cforms (http://www.deliciousdays.com/cforms-plugin/)
+An statistical analysis wordpress plugin for use with form date collected by cforms (http://www.deliciousdays.com/cforms-plugin/)
 
 What is this useful for?
 -------------------------
 
-This plugin is useful for anyone using cforms looking to perform data analysis to judge the effectiveness and conversion rates of their forms. It is also useful for:
+This wordpress plugin is useful for anyone using cforms looking to perform data analysis to judge the effectiveness and conversion rates of their forms. It is also useful for:
 - Surveys
 - Contest forms
 	- The random selection of submissions feature was written specifically for this use case.
