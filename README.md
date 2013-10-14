@@ -28,8 +28,9 @@ Features
 	- Number and percentage of users who answered the question.
 	- Number and percentage of users who abstained from answering the question.
 	- Additional information about answer data:
-		- For Text Inputs, the top 10 most common answers.
-		- For Textareas, the top 10 most common lines of the answers.
+		- For Text Inputs, the top 15 most common answers.
+		- For Textareas, the top 15 most common lines of the answers.
+			- Basic phrase matching is done on lines with no exact match. 
 		- For Checkboxes, Checkbox Groups, Radio Buttons, and Selectboxes, all answers given ranked by popularity.
 - Selection criteria available for reports:
 	- Select an individual cforms form to generate a report for.
