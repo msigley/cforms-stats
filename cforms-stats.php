@@ -3,7 +3,7 @@
 Plugin Name: cforms Stats
 Plugin URI: http://chaosmedley.com/
 Description: Provides data statistics for database form data collected by the cformsII plugin (http://www.deliciousdays.com/cforms-plugin/).
-Version: 1.0.20131003
+Version: 1.0.20131014
 Author: Matthew Sigley
 Author URI: http://chaosmedley.com/
 License: GPLv2
@@ -14,6 +14,12 @@ TODO:
 -Archived form field support.
 
 Change Log:
+1.0.20131014
+-Added basic phrase matching when comparing textarea lines.
+
+1.0.20131008
+-Refactored fuzzy matching when comparing textarea lines.
+-Extended limt on textarea and textfield results to 15.
 
 1.0.20131004
 -Added fuzzy matching when comparing textarea lines.
@@ -190,6 +196,7 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 	foreach($form_fields as &$form_field) {
 		$db_field_name = addslashes(addslashes(substr($form_field['name'], 0, 100)));
 		$delimiter = '';
+		$fuzzy_matching = false;
 		switch($form_field['type']) {
 			case "textfield":
 				//Get the exact 10 most common results
@@ -207,19 +214,18 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 								) t
 							GROUP BY t.field_val
 							ORDER BY data_count DESC
-							LIMIT 10";
+							LIMIT 15";
 				$results = cforms_stats_db_select($query);
 				break;
 				
 			case "textarea":
 				//Data is broken down by phrases separated by newlines. 
 				$delimiter = "\n";
-				$limit = 10;
+				$limit = 15;
 				$fuzzy_matching = true;
 			case "checkboxgroup":
 				//Assume data is comma delimited, is delimiter is not set
 				if (empty($delimiter)) $delimiter = ',';
-				if (empty($fuzzy_matching)) $fuzzy_matching = false;
 				
 				//Get the unique data sets and their number of occurances
 				$query = "SELECT t.field_val as data_values,
@@ -246,34 +252,14 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 					//Split data values based on delimiter
 					$data_values = explode($delimiter, $data_values);
 					foreach ($data_values as $data_value) {
+						//Extensive sanitation to implement fuzzy matches
+						if ($fuzzy_matching) {
+							$data_value = cforms_stats_fuzzy_sanitize($data_value);
+						}
+						
 						//Basic sanitation
 						$data_value = trim($data_value);
 						
-						//Extensive sanitation to implement fuzzy matches
-						if ($fuzzy_matching) {
-							$data_value = strtolower($data_value);
-							
-							//Eliminate articles at the begining of the string
-							$articles = array('the', 'a', 'an');
-							$data_value = explode(' ', $data_value);
-							if( false !== array_search($data_value[0], $articles) )
-								array_shift($data_value);
-							
-							//Replace commonly used symbols with their article equivelent
-							$articles = array('&' => 'and', '@' => 'at', '#' => 'number', '%' => 'percent');
-							foreach( $data_value as &$data_word ) {
-								if( isset($articles[$data_word]) )
-									$data_word = $articles[$data_word];
-							}
-							
-							$data_value = implode(' ', $data_value);
-							
-							//Remove answers equivelent to nothing
-							$empty_words = array('nope', 'no', 'none', 'nothing', 'n/a', 'n\a');
-							if( false !== array_search($data_value, $empty_words) )
-								$data_value = '';
-						}
-							
 						if (!empty($data_value))
 							$results[$data_value] += $result_set->data_count;
 					}
@@ -281,6 +267,47 @@ function cforms_stats_build_data($cforms_form_id, &$form_fields, $unique='', $st
 				
 				//Sort results by data_count
 				arsort($results);
+				
+				if ($fuzzy_matching) {
+					//---Basic Phrase Matching
+					//Remove results that don't match a trend
+					$results_singles = array();
+					end($results);
+					while(1 == current($results)) {
+						//Save result if it contains more than one word
+						if(false !== stripos(key($results), ' ')) {
+							$results_singles[key($results)] = current($results); 
+						}
+						array_pop($results);
+						end($results);
+					}
+					reset($results);
+					
+					//Sort results by key length
+					uksort($results, function($a, $b) {
+							if (strlen($a) == strlen($b))
+						        return 0;
+						    if (strlen($a) > strlen($b))
+						        return -1;
+						    return 1;
+						});
+					
+					foreach($results_singles as $data_single => $result_single) {
+						foreach($results as $data_name => &$result) {
+							if(false !== stristr($data_single, $data_name)) {
+									$result++;
+									unset($results_singles[$data_single]);
+									continue 2;
+							}
+						}
+					}
+					
+					//Add unmatched results back to results array
+					$results = array_merge($results, $results_singles);
+					
+					//Resort results by data_count
+					arsort($results);
+				}
 				
 				//Enforce results limit
 				if (!empty($limit)) $results = array_slice($results, 0, $limit);
@@ -421,4 +448,55 @@ function cforms_stats_date_query($startdate, $enddate) {
 	if( !empty($enddate) )
 		$date_query .= "AND $wpdb->cformssubmissions.sub_date <= '$enddate 23:59:59'\n";
 	return $date_query;
+}
+
+function cforms_stats_fuzzy_sanitize($text_data) {
+	//---Character Sanitation
+	//Convert string to lowercase
+	$text_data = strtolower($text_data);
+	
+	//Replace commonly used symbols with their english equivelent
+	$replacements = array('&' => 'and', '@' => 'at', '#' => 'number', '%' => 'percent');
+	array_walk($replacements, function(&$item, $key) {
+			$item = ' '.$item.' ';
+		});
+	$patterns = array_keys($replacements);
+	array_walk($patterns, function(&$item, $key) {
+			$item = '/['.preg_quote($item).']/';
+		});
+	
+	$text_data_replaced = preg_replace($patterns, $replacements, $text_data);
+	if( isset($text_data_replaced) )
+		$text_data = $text_data_replaced;
+	
+	//Replace all whitespace with spaces
+	$text_data_replaced = preg_replace('/[\s]/', ' ', $text_data);
+	if( isset($text_data_replaced) )
+		$text_data = $text_data_replaced;
+		
+	//Remove all non-alphanumeric characters except spaces
+	$text_data_replaced = preg_replace('/[^\w ]/', '', $text_data);
+	if( isset($text_data_replaced) )
+		$text_data = $text_data_replaced;
+	
+	//Remove all unnecessary whitespace
+	$text_data_replaced = preg_replace('/[\s]{2,}/', ' ', $text_data);
+	if( isset($text_data_replaced) )
+		$text_data = $text_data_replaced;
+		
+	//--Word matching						
+	//Eliminate articles at the begining of the string
+	$articles = array('the', 'a', 'an');
+	$text_data = explode(' ', $text_data);
+	if( false !== array_search($text_data[0], $articles) )
+		array_shift($text_data);
+	
+	$text_data = implode(' ', $text_data);
+	
+	//Remove answers equivelent to nothing
+	$empty_words = array('nope', 'no', 'none', 'nothing', 'n a', 'na');
+	if( false !== array_search($text_data, $empty_words) )
+		$text_data = '';
+		
+	return $text_data;
 }
