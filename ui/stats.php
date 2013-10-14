@@ -36,12 +36,12 @@
 		<?php switch( $cforms_stats_field['type'] ) {
 			case 'textarea':
 				?>
-				<h4>Top 10 Most Common Lines of the Answers</h4>
+				<h4>Top 15 Most Common Lines of the Answers</h4>
 				<?php
 				break;
 			case 'textfield':
 				?>
-				<h4>Top 10 Most Common Answers</h4>
+				<h4>Top 15 Most Common Answers</h4>
 				<?php
 				break;
 			default:
