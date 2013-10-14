@@ -45,3 +45,5 @@ Wishlist
 - Input validation on the report form.
 - Appropriate messages/checks based on the data tracking settings in cforms.
 - Support for archived form fields. Archived fields are those whose label or field type has changed since their creation.
+- Paged individual field results.
+- Submission number by date graph.
